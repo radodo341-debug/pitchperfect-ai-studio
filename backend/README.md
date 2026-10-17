@@ -14,9 +14,21 @@ The upstream authors publish trained checkpoints through their [official checkpo
 /opt/T-DEED/checkpoints/SoccerNetBall/SoccerNetBall_challenge1/checkpoint_best.pt
 ```
 
-Do not commit the checkpoint to this Git repository. It is a large binary model file. The service's `/health` endpoint reports `checkpoint_ready: false` until this file exists.
+Do not commit the checkpoint to this Git repository. It is a large binary model file. The service's `/health` endpoint reports `checkpoint_ready: false` until this file exists. For Render, the backend can fetch the checkpoint at startup if you set `TDEED_CHECKPOINT_URL` to a direct HTTPS download URL for the actual `.pt` file. A folder page or HTML preview URL will not work; the service checks that the response resembles a PyTorch checkpoint.
 
-## 2. Build and run
+## 2. Deploy on Render
+
+The repository includes a [Render Blueprint](../render.yaml). Open the repository in Render's Blueprint flow, authorize access to this GitHub repository, and create the service from `render.yaml`. The blueprint uses a standard CPU instance because the free 512 MB service is not a realistic target for PyTorch video inference. Check the current plan price before confirming; creating the service can incur charges.
+
+After creation:
+1. Open the service's **Environment** settings.
+2. Set `TDEED_CHECKPOINT_URL` to a direct HTTPS URL that downloads the official `checkpoint_best.pt` file (not a folder page).
+3. Save and redeploy. The API starts first, then downloads the checkpoint in the background. This can take several minutes; wait until `/health` returns `"ready": true`.
+4. Copy the service's HTTPS `onrender.com` URL.
+
+The checkpoint is not included in GitHub and cannot be downloaded from the upstream folder link automatically without selecting the specific checkpoint file. Keep the URL private if it contains any access token.
+
+## 3. Build and run
 
 From the repository root:
 
@@ -32,7 +44,7 @@ Replace `/absolute/path/to/checkpoint_best.pt` with the actual file path on the 
 
 Check `http://localhost:8000/health`. `ready` must be `true` before detection is available.
 
-## 3. API
+## 4. API
 
 - `GET /health` reports source/checkpoint readiness.
 - `POST /api/detect` accepts multipart field `file` and optional query `threshold` (0.01–0.99), returning timestamped predictions.
