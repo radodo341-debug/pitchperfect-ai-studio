@@ -75,7 +75,7 @@ $('startTime').addEventListener('input',updateRange);$('endTime').addEventListen
 $('setStartBtn').addEventListener('click',()=>{if(!file)return;$('startTime').value=video.currentTime.toFixed(1);if(Number($('endTime').value)<=video.currentTime)$('endTime').value=Math.min(duration,video.currentTime+1).toFixed(1);updateRange()});
 $('setEndBtn').addEventListener('click',()=>{if(!file)return;$('endTime').value=video.currentTime.toFixed(1);updateRange()});
 function drawFrameAt(time,canvas,ctx){return new Promise((resolve,reject)=>{const onSeek=()=>{video.removeEventListener('seeked',onSeek);try{ctx.drawImage(video,0,0,canvas.width,canvas.height);resolve()}catch(e){reject(e)}};video.addEventListener('seeked',onSeek,{once:true});video.currentTime=time})}
-function serviceBase(){return $('modelApiUrl').value.trim().replace(/\\/+$/,'')}
+function serviceBase(){return $('modelApiUrl').value.trim().replace(/\/+$/,'')}
 $('modelApiUrl').addEventListener('input',()=>{ $('modelScanBtn').disabled=!file||!serviceBase(); });
 $('healthBtn').addEventListener('click',async()=>{
  const base=serviceBase();if(!base){setStatus('modelStatus','Enter the URL of your deployed T-DEED service first.');return}
