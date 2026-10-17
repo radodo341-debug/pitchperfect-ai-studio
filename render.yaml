@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: pitchperfect-tdeed-api
+    runtime: docker
+    plan: standard
+    region: frankfurt
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    envVars:
+      - key: CORS_ORIGINS
+        value: https://radodo341-debug.github.io
+      - key: MAX_UPLOAD_MB
+        value: "500"
+      - key: TDEED_MODEL
+        value: SoccerNetBall_challenge1
+      - key: TDEED_THRESHOLD
+        value: "0.30"
+      - key: TDEED_CHECKPOINT_URL
+        sync: false
