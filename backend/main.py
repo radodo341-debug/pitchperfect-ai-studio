@@ -134,7 +134,7 @@ async def detect(file: UploadFile = File(...), threshold: float = THRESHOLD_DEFA
                 frame = int(item.get("frame", 0))
                 events.append({
                     "label": str(item.get("label", "Unknown")),
-                    "time_seconds": round(frame * 2 / 25, 3),
+                    "time_seconds": round(frame / 25, 3),
                     "frame": frame,
                     "confidence": round(float(item.get("confidence", 0)), 4),
                     "source": "T-DEED SoccerNet Ball Action Spotting",
