@@ -32,6 +32,45 @@ app.add_middleware(
 inference_lock = asyncio.Lock()
 
 
+def _download_checkpoint() -> None:
+    """Download a trusted, direct HTTPS checkpoint URL configured by the service owner."""
+    import urllib.request
+
+    url = os.getenv("TDEED_CHECKPOINT_URL", "").strip()
+    if CHECKPOINT.is_file() or not url:
+        return
+    if not url.startswith("https://"):
+        raise RuntimeError("TDEED_CHECKPOINT_URL must be a direct HTTPS download URL.")
+    CHECKPOINT.parent.mkdir(parents=True, exist_ok=True)
+    partial = CHECKPOINT.with_suffix(".pt.part")
+    request = urllib.request.Request(url, headers={"User-Agent": "PitchPerfect-TDEED/0.1"})
+    total = 0
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response, partial.open("wb") as output:
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > 2 * 1024 * 1024 * 1024:
+                    raise RuntimeError("Checkpoint download exceeded the 2 GB safety limit.")
+                output.write(chunk)
+        with partial.open("rb") as downloaded:
+            signature = downloaded.read(8)
+        # PyTorch checkpoints are commonly ZIP archives ("PK") or legacy pickle streams.
+        if total < 1024 * 1024 or not (signature.startswith(b"PK") or signature.startswith(b"\\x80")):
+            raise RuntimeError("Checkpoint URL did not return a recognizable PyTorch checkpoint file.")
+        partial.replace(CHECKPOINT)
+    finally:
+        partial.unlink(missing_ok=True)
+
+
+@app.on_event("startup")
+async def schedule_checkpoint_download() -> None:
+    if os.getenv("TDEED_CHECKPOINT_URL", "").strip() and not CHECKPOINT.is_file():
+        asyncio.create_task(asyncio.to_thread(_download_checkpoint))
+
+
 def model_status() -> dict[str, Any]:
     source_ready = (TDEED_DIR / "inference.py").is_file()
     return {
