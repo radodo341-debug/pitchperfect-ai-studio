@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git ffmpeg libglib2.0-0 libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
-# CPU-only PyTorch keeps the image from pulling CUDA libraries.
+# CPU-only PyTorch avoids downloading CUDA runtime libraries.
 RUN pip install --index-url https://download.pytorch.org/whl/cpu \
     torch==2.3.1 torchvision==0.18.1
 
@@ -23,12 +23,13 @@ RUN pip install \
     SoccerNet \
     wandb==0.17.4
 
+COPY patch_tdeed.py /app/patch_tdeed.py
 RUN git clone --depth 1 https://github.com/arturxe2/T-DEED.git /opt/T-DEED \
     && mkdir -p /opt/T-DEED/checkpoints/SoccerNetBall/SoccerNetBall_challenge1 \
-    && sed -i 's/pretrained=True/pretrained=False/g' /opt/T-DEED/model/model.py \
-    && sed -i "s/'checkpoint_best.pt')))/'checkpoint_best.pt'), map_location='cpu')))/" /opt/T-DEED/inference.py
+    && python /app/patch_tdeed.py
 
 COPY main.py /app/main.py
+COPY start.sh /app/start.sh
 WORKDIR /app
 EXPOSE 8000
-CMD ["python", "main.py"]
+CMD ["sh", "/app/start.sh"]
