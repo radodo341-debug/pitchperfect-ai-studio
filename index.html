@@ -45,6 +45,22 @@
 <div class="stats" style="margin-top:15px"><div class="stat"><strong id="clipDuration">15s</strong><span>CLIP LENGTH</span></div><div class="stat"><strong id="aspectStat">16:9</strong><span>FRAME</span></div><div class="stat"><strong id="speedStat">1×</strong><span>SPEED</span></div></div>
 <div class="section"><h2>Export video</h2><p class="muted small">Rendering uses FFmpeg WebAssembly in this browser. The first export may need to download the engine and can use significant memory. Short clips work best.</p><button id="exportBtn" class="primary" style="width:100%;margin-top:8px" disabled>Render & download MP4</button><div class="progress"><div id="exportProgress"></div></div><div id="exportStatus" class="status" role="status" aria-live="polite">Upload a video to enable export.</div></div>
 <div class="section"><h2>Project checks</h2><div class="suggestions"><div class="suggestion"><div><strong>Local preview</strong><span>Video stays in-browser unless you send it to your chosen AI service.</span></div><span>✓</span></div><div class="suggestion"><div><strong>Manual control</strong><span>Choose trim points, speed and frame shape.</span></div><span>✓</span></div><div class="suggestion"><div><strong>True football AI</strong><span>Requires a compatible trained model and model weights.</span></div><span>Next</span></div></div></div>
+
+<div class="section" id="autoEditSection">
+ <div class="panel-head"><h2>05 / AUTOMATIC FOOTBALL EDIT</h2><span class="pill">BETA</span></div>
+ <div class="notice">Build a multi-clip edit from motion peaks and music beats. This is an automatic editing assistant, not proof of goals or skills; review the suggested moments before export.</div>
+ <div class="field" style="margin-top:12px"><label for="musicInput">MUSIC TRACK (OPTIONAL)</label><input id="musicInput" type="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg" style="width:100%;background:#0b0f11;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px"></div>
+ <div class="fields" style="margin-top:10px">
+  <div class="field"><label for="editStyle">EDIT STYLE</label><select id="editStyle"><option value="hype">Hype / skills</option><option value="cinematic">Cinematic</option><option value="clean">Clean highlights</option></select></div>
+  <div class="field"><label for="editLength">TARGET LENGTH</label><select id="editLength"><option value="10">10 seconds</option><option value="15" selected>15 seconds</option><option value="20">20 seconds</option><option value="30">30 seconds</option></select></div>
+  <div class="field"><label for="editCuts">CLIP COUNT</label><select id="editCuts"><option value="4">4 clips</option><option value="6" selected>6 clips</option><option value="8">8 clips</option><option value="10">10 clips</option></select></div>
+ </div>
+ <div class="row" style="margin-top:12px"><button id="autoAnalyzeBtn" class="primary" disabled>Analyse & build edit plan</button><button id="autoExportBtn" disabled>Render automatic edit</button></div>
+ <div id="autoStatus" class="status" role="status" aria-live="polite">Upload footage to start. Add a music track for beat analysis and beat-aligned cuts.</div>
+ <div class="progress"><div id="autoProgress"></div></div>
+ <div id="autoPlan" class="suggestions"></div>
+ <p class="muted small">Effects are rendered locally in your browser. Short clips are recommended. For semantic goal/skill/tackle detection, connect a real trained football model.</p>
+</div>
 </aside>
 </main>
 <footer class="footer"><span>PitchPerfect AI Studio · Prototype foundation</span><span>Use footage you have permission to edit. Keep this tab open during rendering.</span></footer>
@@ -68,7 +84,7 @@ $('chooseBtn').addEventListener('click',chooseFile);$('replaceBtn').addEventList
 fileInput.addEventListener('change',()=>{
  const next=fileInput.files&&fileInput.files[0];if(!next)return;
  if(!next.type.startsWith('video/')&&!/\.(mp4|mov|webm)$/i.test(next.name)){setStatus('exportStatus','Please choose an MP4, MOV or WebM video.');fileInput.value='';return}
- file=next;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(file);video.src=objectUrl;video.classList.remove('hidden');$('emptyState').classList.add('hidden');$('mediaLabel').textContent=file.name;$('scanBtn').disabled=false;$('modelScanBtn').disabled=!serviceBase();$('exportBtn').disabled=false;setStatus('exportStatus','Video loaded. Choose trim points and render.');setStatus('scanStatus','Ready to scan activity peaks.');$('suggestions').replaceChildren();
+ file=next;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(file);video.src=objectUrl;video.classList.remove('hidden');$('emptyState').classList.add('hidden');$('mediaLabel').textContent=file.name;$('scanBtn').disabled=false;$('modelScanBtn').disabled=!serviceBase();$('exportBtn').disabled=false;if(autoAnalyzeBtn)autoAnalyzeBtn.disabled=false;setStatus('exportStatus','Video loaded. Choose trim points and render.');setStatus('scanStatus','Ready to scan activity peaks.');$('suggestions').replaceChildren();
 });
 video.addEventListener('loadedmetadata',()=>{duration=Number.isFinite(video.duration)?video.duration:0;$('durationLabel').textContent='Duration '+duration.toFixed(1)+'s';$('startTime').value='0';$('endTime').value=Math.min(15,duration).toFixed(1);updateRange()});
 $('startTime').addEventListener('input',updateRange);$('endTime').addEventListener('input',updateRange);$('aspect').addEventListener('change',updateRange);$('speed').addEventListener('change',updateRange);
@@ -122,6 +138,67 @@ $('exportBtn').addEventListener('click',async()=>{
   const vf='scale='+w+':'+h+':force_original_aspect_ratio=increase,crop='+w+':'+h+',setsar=1,setpts='+ (1/speed).toFixed(4)+'*PTS';const args=['-ss',r.start.toFixed(3),'-i',input,'-t',(r.end-r.start).toFixed(3),'-vf',vf,'-af','atempo='+speed,'-c:v','libx264','-preset','ultrafast','-crf','21','-c:a','aac','-b:a','160k','-movflags','+faststart',output];setStatus('exportStatus','Rendering locally. Keep this tab open…');await ffmpeg.exec(args);const bytes=await ffmpeg.readFile(output);const blob=new Blob([bytes],{type:'video/mp4'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='pitchperfect-highlight.mp4';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);setStatus('exportStatus','Export finished. Your MP4 download should be ready.');await ffmpeg.deleteFile(input);await ffmpeg.deleteFile(output)
  }catch(error){setStatus('exportStatus','Export could not finish: '+(error.message||String(error))+'. Try a shorter MP4 or another browser.')}finally{$('exportBtn').disabled=!file||currentRange().end<=currentRange().start}
 });
+
+let autoPlan=[], musicFile=null, detectedBeats=[];
+const musicInput=$('musicInput'), autoAnalyzeBtn=$('autoAnalyzeBtn'), autoExportBtn=$('autoExportBtn');
+musicInput.addEventListener('change',()=>{musicFile=musicInput.files&&musicInput.files[0]||null;setStatus('autoStatus',musicFile?'Music selected: '+musicFile.name+'. Analyse to detect beats.':'No music selected; the source audio will be retained.');});
+async function analyseMusicBeats(audioFile){
+ if(!audioFile)return [];
+ const AC=window.AudioContext||window.webkitAudioContext;if(!AC)throw new Error('Audio analysis is not supported in this browser.');
+ const ac=new AC();try{
+  const buf=await ac.decodeAudioData(await audioFile.arrayBuffer());const channel=buf.getChannelData(0),sr=buf.sampleRate,hop=512,win=1024,energy=[];
+  for(let i=0;i+win<channel.length;i+=hop){let sum=0;for(let j=0;j<win;j+=4){const v=channel[i+j];sum+=v*v}energy.push(Math.sqrt(sum/(win/4)))}
+  const flux=energy.map((v,i)=>Math.max(0,v-(energy[i-1]||0)));const mean=flux.reduce((a,b)=>a+b,0)/(flux.length||1);const beats=[];
+  for(let i=2;i<flux.length-2;i++){if(flux[i]>mean*1.7&&flux[i]>=flux[i-1]&&flux[i]>=flux[i+1]&&flux[i]>.012){const t=i*hop/sr;if(!beats.length||t-beats[beats.length-1]>.22)beats.push(t)}}
+  return beats;
+ }finally{ac.close()}
+}
+async function buildAutomaticPlan(){
+ if(!file||!duration)throw new Error('Upload a video first.');
+ autoAnalyzeBtn.disabled=true;autoExportBtn.disabled=true;$('autoProgress').style.width='0%';$('autoPlan').replaceChildren();setStatus('autoStatus','Analysing footage for activity peaks…');
+ const oldTime=video.currentTime,wasPaused=video.paused,canvas=document.createElement('canvas');canvas.width=96;canvas.height=54;const ctx=canvas.getContext('2d',{willReadFrequently:true});let previous=null;const scores=[];
+ try{
+  const samples=Math.min(100,Math.max(12,Math.ceil(duration*1.5)));
+  for(let i=0;i<samples;i++){const t=duration*i/(samples-1);await drawFrameAt(t,canvas,ctx);const px=ctx.getImageData(0,0,canvas.width,canvas.height).data;let score=0;if(previous){for(let j=0;j<px.length;j+=16)score+=Math.abs(px[j]-previous[j])+Math.abs(px[j+1]-previous[j+1])+Math.abs(px[j+2]-previous[j+2]);score/=px.length/16}previous=new Uint8ClampedArray(px);scores.push({time:t,score});$('autoProgress').style.width=(i+1)/samples*55+'%'}
+  setStatus('autoStatus',musicFile?'Analysing music transients and aligning cuts…':'Selecting distinct activity moments…');
+  detectedBeats=await analyseMusicBeats(musicFile);$('autoProgress').style.width='70%';
+  const wanted=Number($('editCuts').value),target=Number($('editLength').value),style=$('editStyle').value;
+  const ranked=[...scores].sort((a,b)=>b.score-a.score),peaks=[];
+  for(const item of ranked){if(peaks.every(p=>Math.abs(p.time-item.time)>Math.max(1.6,duration*.045)))peaks.push(item);if(peaks.length>=wanted*2)break}
+  if(!peaks.length)peaks.push(...scores.filter((_,i)=>i%Math.max(1,Math.floor(scores.length/wanted))===0).slice(0,wanted));
+  peaks.sort((a,b)=>a.time-b.time);
+  const chosen=[];for(let i=0;i<wanted;i++){let p;if(peaks.length){p=peaks[Math.min(peaks.length-1,Math.floor((i+.5)*peaks.length/wanted))]}else p={time:duration*(i+.5)/wanted,score:0};if(!chosen.some(x=>Math.abs(x.time-p.time)<.6))chosen.push(p)}
+  const segLen=Math.max(.7,target/Math.max(1,chosen.length));autoPlan=chosen.slice(0,wanted).map((p,i)=>{
+   let start=clamp(p.time-segLen*.42,0,Math.max(0,duration-segLen));if(detectedBeats.length){const near=detectedBeats.reduce((best,t)=>Math.abs(t-start)<Math.abs(best-start)?t:best,detectedBeats[0]);if(Math.abs(near-start)<1.1)start=clamp(near,0,Math.max(0,duration-segLen))}
+   const len=Math.min(segLen,duration-start);return {start,end:start+len,score:p.score||0,style,index:i+1}
+  });
+  if(autoPlan.length){const total=autoPlan.reduce((s,x)=>s+x.end-x.start,0);autoPlan[autoPlan.length-1].end=Math.min(duration,autoPlan[autoPlan.length-1].end+Math.max(0,target-total));}
+  autoPlan.forEach((seg)=>{const card=document.createElement('div');card.className='suggestion';const info=document.createElement('div');const strong=document.createElement('strong');strong.textContent='Clip '+seg.index+' · '+seg.start.toFixed(1)+'–'+seg.end.toFixed(1)+'s';const detail=document.createElement('span');detail.textContent='Motion score '+seg.score.toFixed(1)+(detectedBeats.length?' · music beats detected':' · no beat track');info.append(strong,detail);const btn=document.createElement('button');btn.textContent='Preview';btn.addEventListener('click',()=>{video.currentTime=seg.start;video.play().catch(()=>{});$('startTime').value=seg.start.toFixed(1);$('endTime').value=seg.end.toFixed(1);updateRange()});card.append(info,btn);$('autoPlan').append(card)});
+  $('autoProgress').style.width='100%';autoExportBtn.disabled=!autoPlan.length;setStatus('autoStatus','Edit plan ready: '+autoPlan.length+' clips'+(detectedBeats.length?', '+detectedBeats.length+' candidate music beats detected':'')+'. Review the moments, then render. Motion peaks are not semantic football events.');
+ }finally{video.currentTime=oldTime;if(!wasPaused)video.play().catch(()=>{});autoAnalyzeBtn.disabled=!file}
+}
+autoAnalyzeBtn.addEventListener('click',async()=>{try{await buildAutomaticPlan()}catch(e){setStatus('autoStatus','Analysis failed: '+(e.message||String(e)));$('autoProgress').style.width='0%'}});
+async function renderAutomaticEdit(){
+ if(!file||!autoPlan.length)return;autoExportBtn.disabled=true;autoAnalyzeBtn.disabled=true;$('autoProgress').style.width='0%';
+ try{
+  const ffmpeg=await getFFmpeg(),input='auto-input.'+((file.name.split('.').pop()||'mp4').replace(/[^a-z0-9]/gi,'').toLowerCase()),out='pitchperfect-automatic-edit.mp4';
+  await ffmpeg.writeFile(input,new Uint8Array(await file.arrayBuffer()));
+  const ratio=$('aspect').value,res=Number($('resolution').value);let w=res,h=Math.round(res*9/16);if(ratio==='9:16'){h=res;w=Math.round(res*9/16)}else if(ratio==='1:1'){w=res;h=res}w=Math.max(2,Math.floor(w/2)*2);h=Math.max(2,Math.floor(h/2)*2);
+  const style=$('editStyle').value,filters=style==='hype'?'eq=contrast=1.20:saturation=1.32,unsharp=5:5:0.65':style==='cinematic'?'eq=contrast=1.12:saturation=1.12:brightness=-0.015,unsharp=5:5:0.45':'eq=contrast=1.06:saturation=1.08';
+  const parts=[],labels=[];autoPlan.forEach((seg,i)=>{const v='v'+i;let vf='scale='+w+':'+h+':force_original_aspect_ratio=increase,crop='+w+':'+h+',setsar=1,'+filters;if(style==='hype')vf+=',eq=brightness=0.025:eval=frame';parts.push('[0:v]trim=start='+seg.start.toFixed(3)+':end='+seg.end.toFixed(3)+',setpts=PTS-STARTPTS,fps=30,'+vf+'['+v+']');labels.push('['+v+']')});
+  let args,fc=parts.join(';')+';'+labels.join('')+'concat=n='+labels.length+':v=1:a=0[vout]';
+  if(musicFile){const musicExt=((musicFile.name.split('.').pop()||'mp3').replace(/[^a-z0-9]/gi,'').toLowerCase());const musicName='auto-music.'+musicExt;await ffmpeg.writeFile(musicName,new Uint8Array(await musicFile.arrayBuffer()));args=['-i',input,'-i',musicName,'-filter_complex',fc,'-map','[vout]','-map','1:a:0','-t',String(Number($('editLength').value)),'-c:v','libx264','-preset','ultrafast','-crf','21','-c:a','aac','-b:a','192k','-shortest','-movflags','+faststart',out]}
+  else {
+   const ac=[];autoPlan.forEach((seg,i)=>{ac.push('[0:a]atrim=start='+seg.start.toFixed(3)+':end='+seg.end.toFixed(3)+',asetpts=PTS-STARTPTS[a'+i+']')});
+   fc+=';'+ac.join(';')+';'+autoPlan.map((_,i)=>'[v'+i+'][a'+i+']').join('')+'concat=n='+autoPlan.length+':v=1:a=1[vout][aout]';
+   args=['-i',input,'-filter_complex',fc,'-map','[vout]','-map','[aout]','-c:v','libx264','-preset','ultrafast','-crf','21','-c:a','aac','-b:a','160k','-movflags','+faststart',out]
+  }
+  setStatus('autoStatus','Rendering your automatic edit in this browser. Keep this tab open…');await ffmpeg.exec(args);const data=await ffmpeg.readFile(out),url=URL.createObjectURL(new Blob([data],{type:'video/mp4'})),a=document.createElement('a');a.href=url;a.download=out;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);setStatus('autoStatus','Automatic edit rendered and downloaded. Review it; this first version uses motion peaks, not guaranteed goal/skill recognition.');
+  for(const f of [input,out,'auto-music.'+((musicFile&&musicFile.name.split('.').pop()||'mp3').replace(/[^a-z0-9]/gi,'').toLowerCase())]){try{await ffmpeg.deleteFile(f)}catch{}}
+ }catch(e){setStatus('autoStatus','Automatic render failed: '+(e.message||String(e))+'. Try a shorter clip or remove the music track and retry.')}finally{autoExportBtn.disabled=!autoPlan.length;autoAnalyzeBtn.disabled=!file}
+}
+autoExportBtn.addEventListener('click',renderAutomaticEdit);
+
 updateRange();
 </script>
 </body>
