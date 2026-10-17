@@ -8,11 +8,20 @@ A browser-first football highlight editor for creators making YouTube Shorts, Ti
 - Start/end trim points and set-to-playhead controls
 - 9:16, 16:9 and 1:1 output framing
 - Playback speed controls
-- Experimental local frame-difference scan that suggests high-motion moments
+- Optional **T-DEED / SoccerNet Ball Action Spotting** inference-service connection for timestamped football-event predictions
+- Experimental local frame-difference scan as a fallback; this is not semantic football-event detection
 - MP4 export using FFmpeg WebAssembly, loaded on demand
 - Responsive UI and Playwright smoke tests on GitHub Actions
 
-## Run the browser tests
+## Genuine football-event model
+
+The `backend/` folder contains a FastAPI adapter for the official [T-DEED implementation](https://github.com/arturxe2/T-DEED) and its SoccerNet Ball Action Spotting model. It can return timestamped predictions for classes such as Goal, Shot, Header, Cross and Player Successful Tackle.
+
+**The pretrained checkpoint is not included in this repository and the inference service is not yet hosted.** Obtain the checkpoint through the upstream authors' [official checkpoint folder](https://drive.google.com/drive/folders/1sxZalU_hCwL8ITZCU9VqSWE8dB94lJty?usp=drive_link), follow the upstream model/data terms, and follow the setup in [backend/README.md](backend/README.md). Until a compatible checkpoint is installed, the backend health endpoint will report that the model is not ready.
+
+The frontend's **Football AI Service URL** field must point to a deployed backend that reports `ready: true` from `/health`. Clicking **Detect football events** sends the selected video to that service. Only enter a service URL you trust. Model predictions can be wrong and need review.
+
+## Run browser tests
 
 Requires Node.js 20 or newer:
 
@@ -22,23 +31,26 @@ npx playwright install --with-deps chromium
 npm run test:e2e
 ```
 
-GitHub Actions runs the browser tests on pushes to `main`, pull requests, and manual workflow dispatch.
+GitHub Actions runs browser tests and checks Python syntax on pushes to `main`, pull requests, and manual workflow dispatch.
 
 ## GitHub Pages
 
-This is a static site and can be hosted from the repository root using GitHub Pages. In repository settings, open **Pages**, select **Deploy from a branch**, choose `main` and `/(root)`, then save. The deployed page will be available at the URL GitHub Pages reports.
+The frontend is a static site and can be hosted from the repository root using GitHub Pages. In repository settings, open **Pages**, select **Deploy from a branch**, choose `main` and `/(root)`, then save. The deployed page will be available at the URL GitHub Pages reports.
 
-## Important limitations
+GitHub Pages only hosts the frontend; it does not run the Python/PyTorch inference service. Deploy the backend separately and use its HTTPS URL in the editor.
 
-This is an early editor foundation, not a complete professional editor. The activity scan compares sampled frames and **does not classify goals, tackles, saves, players or named identities**. It can suggest visually active timestamps but should not label them as verified football events.
+## Limitations
 
-A real event detector needs a compatible trained model and its weights, plus evaluation on representative football footage. SoccerNet provides research benchmarks and baselines: https://github.com/SoccerNet/sn-spotting and https://github.com/SoccerNet/sn-teamspotting. Review their dataset access, licenses and model requirements before integrating any checkpoint.
+- This is an early editor foundation, not a complete professional editor.
+- The local frame-difference scan only suggests visually active timestamps; it does not identify event semantics.
+- The T-DEED integration code is committed, but a checkpoint must be installed and the backend must be deployed before genuine model inference is available to the website.
+- Rendering uses FFmpeg WebAssembly in the browser. Large videos may exceed browser memory limits; short clips are recommended. The first export needs a network connection to load the engine.
+- Named-player identity, reliable player tracking, beat detection and a full multitrack timeline are not implemented yet.
 
-Rendering uses FFmpeg WebAssembly in the browser. Large videos may exceed browser memory limits; short clips are recommended. The first export needs a network connection to load the engine. This prototype does not upload source footage to an application server.
+## Model references
 
-## Next milestones
+- [T-DEED official implementation and inference instructions](https://github.com/arturxe2/T-DEED)
+- [SoccerNet action spotting benchmark](https://github.com/SoccerNet/sn-spotting)
+- [SoccerNet team/ball action spotting benchmark](https://github.com/SoccerNet/sn-teamspotting)
 
-1. Run and stabilize browser tests against real sample videos in desktop and mobile Chromium.
-2. Add a model-backed football-event detection pipeline with confidence scores and timestamps.
-3. Add editable timeline tracks, captions, beat analysis and more reliable audio handling.
-4. Evaluate exports for audio/no-audio files, long inputs, rotation metadata and different browsers.
+Review upstream licenses, checkpoint terms and dataset access requirements before deploying or redistributing model components.
