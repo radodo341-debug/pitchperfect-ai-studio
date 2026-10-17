@@ -9,6 +9,8 @@ test('editor loads and exposes core editing controls', async ({ page }) => {
   await expect(page.getByRole('button', { name: /Choose video/i })).toBeVisible();
   await expect(page.locator('#startTime')).toHaveValue('0');
   await expect(page.locator('#aspect')).toHaveValue('16:9');
+  await expect(page.locator('#modelApiUrl')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Detect football events/i })).toBeDisabled();
   await expect(page.getByRole('button', { name: /Render & download MP4/i })).toBeDisabled();
   await expect(page.getByRole('button', { name: /Scan for exciting moments/i })).toBeDisabled();
   expect(pageErrors).toEqual([]);
