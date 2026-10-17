@@ -24,6 +24,7 @@ RUN pip install \
     wandb==0.17.4
 
 RUN git clone --depth 1 https://github.com/arturxe2/T-DEED.git /opt/T-DEED \
+    && mkdir -p /opt/T-DEED/checkpoints/SoccerNetBall/SoccerNetBall_challenge1 \
     && sed -i 's/pretrained=True/pretrained=False/g' /opt/T-DEED/model/model.py \
     && sed -i "s/'checkpoint_best.pt')))/'checkpoint_best.pt'), map_location='cpu')))/" /opt/T-DEED/inference.py
 
