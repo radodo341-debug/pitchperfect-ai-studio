@@ -28,8 +28,13 @@
 <div class="timeline"><div class="row" style="justify-content:space-between"><span class="small">EDIT RANGE</span><span id="rangeLabel" class="small muted">0.0s — 15.0s</span></div><div class="track"><div id="rangeBar" class="range" style="left:0;width:100%"></div></div><div class="muted small">Tip: use the video controls to find a moment, then set the start or end to the playhead.</div></div>
 </div>
 <div class="section"><div class="panel-head"><h2>03 / HIGHLIGHT FINDER</h2><span class="pill">EXPERIMENTAL</span></div>
-<div class="notice warning">This is a lightweight motion/audio activity scan, not a trained football-event model. Suggestions are candidate moments only; goals, tackles and saves are not verified.</div>
-<div class="row" style="margin-top:11px"><button id="scanBtn" class="primary" disabled>Scan for exciting moments</button><span class="muted small">Samples the video locally</span></div>
+<div class="notice warning">The local activity scan below is only a heuristic. For genuine event labels, connect the SoccerNet T-DEED inference service. A model prediction is still a suggestion, not a guarantee.</div>
+<div class="section" style="margin-top:12px;padding-top:12px"><div class="field"><label for="modelApiUrl">FOOTBALL AI SERVICE URL</label><input id="modelApiUrl" type="url" placeholder="https://your-deployed-inference-service.example" autocomplete="url"></div>
+<div class="row" style="margin-top:9px"><button id="healthBtn">Check AI service</button><button id="modelScanBtn" class="primary" disabled>Detect football events</button></div>
+<div id="modelStatus" class="status" role="status" aria-live="polite">Connect a running T-DEED service with its pretrained checkpoint to enable real event detection.</div>
+<div class="progress"><div id="modelProgress"></div></div><div id="modelSuggestions" class="suggestions"></div>
+<p class="muted small">When you click Detect, the selected video is uploaded to the service URL you enter. Do not use a service you do not trust.</p></div>
+<div class="row" style="margin-top:11px"><button id="scanBtn" class="primary" disabled>Scan for exciting moments (local)</button><span class="muted small">Frame-difference heuristic only</span></div>
 <div class="progress"><div id="scanProgress"></div></div><div id="scanStatus" class="status" role="status" aria-live="polite">Upload a video to scan for activity peaks.</div><div id="suggestions" class="suggestions"></div>
 </div>
 </section>
@@ -39,7 +44,7 @@
 <div class="field" style="margin-top:12px"><label for="resolution">OUTPUT RESOLUTION</label><select id="resolution"><option value="720">720p · Faster</option><option value="1080" selected>1080p · Full HD</option></select></div>
 <div class="stats" style="margin-top:15px"><div class="stat"><strong id="clipDuration">15s</strong><span>CLIP LENGTH</span></div><div class="stat"><strong id="aspectStat">16:9</strong><span>FRAME</span></div><div class="stat"><strong id="speedStat">1×</strong><span>SPEED</span></div></div>
 <div class="section"><h2>Export video</h2><p class="muted small">Rendering uses FFmpeg WebAssembly in this browser. The first export may need to download the engine and can use significant memory. Short clips work best.</p><button id="exportBtn" class="primary" style="width:100%;margin-top:8px" disabled>Render & download MP4</button><div class="progress"><div id="exportProgress"></div></div><div id="exportStatus" class="status" role="status" aria-live="polite">Upload a video to enable export.</div></div>
-<div class="section"><h2>Project checks</h2><div class="suggestions"><div class="suggestion"><div><strong>Source stays local</strong><span>Video is not uploaded to a server by this page.</span></div><span>✓</span></div><div class="suggestion"><div><strong>Manual control</strong><span>Choose trim points, speed and frame shape.</span></div><span>✓</span></div><div class="suggestion"><div><strong>True football AI</strong><span>Requires a compatible trained model and model weights.</span></div><span>Next</span></div></div></div>
+<div class="section"><h2>Project checks</h2><div class="suggestions"><div class="suggestion"><div><strong>Local preview</strong><span>Video stays in-browser unless you send it to your chosen AI service.</span></div><span>✓</span></div><div class="suggestion"><div><strong>Manual control</strong><span>Choose trim points, speed and frame shape.</span></div><span>✓</span></div><div class="suggestion"><div><strong>True football AI</strong><span>Requires a compatible trained model and model weights.</span></div><span>Next</span></div></div></div>
 </aside>
 </main>
 <footer class="footer"><span>PitchPerfect AI Studio · Prototype foundation</span><span>Use footage you have permission to edit. Keep this tab open during rendering.</span></footer>
@@ -63,13 +68,37 @@ $('chooseBtn').addEventListener('click',chooseFile);$('replaceBtn').addEventList
 fileInput.addEventListener('change',()=>{
  const next=fileInput.files&&fileInput.files[0];if(!next)return;
  if(!next.type.startsWith('video/')&&!/\.(mp4|mov|webm)$/i.test(next.name)){setStatus('exportStatus','Please choose an MP4, MOV or WebM video.');fileInput.value='';return}
- file=next;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(file);video.src=objectUrl;video.classList.remove('hidden');$('emptyState').classList.add('hidden');$('mediaLabel').textContent=file.name;$('scanBtn').disabled=false;$('exportBtn').disabled=false;setStatus('exportStatus','Video loaded. Choose trim points and render.');setStatus('scanStatus','Ready to scan activity peaks.');$('suggestions').replaceChildren();
+ file=next;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(file);video.src=objectUrl;video.classList.remove('hidden');$('emptyState').classList.add('hidden');$('mediaLabel').textContent=file.name;$('scanBtn').disabled=false;$('modelScanBtn').disabled=false;$('exportBtn').disabled=false;setStatus('exportStatus','Video loaded. Choose trim points and render.');setStatus('scanStatus','Ready to scan activity peaks.');$('suggestions').replaceChildren();
 });
 video.addEventListener('loadedmetadata',()=>{duration=Number.isFinite(video.duration)?video.duration:0;$('durationLabel').textContent='Duration '+duration.toFixed(1)+'s';$('startTime').value='0';$('endTime').value=Math.min(15,duration).toFixed(1);updateRange()});
 $('startTime').addEventListener('input',updateRange);$('endTime').addEventListener('input',updateRange);$('aspect').addEventListener('change',updateRange);$('speed').addEventListener('change',updateRange);
 $('setStartBtn').addEventListener('click',()=>{if(!file)return;$('startTime').value=video.currentTime.toFixed(1);if(Number($('endTime').value)<=video.currentTime)$('endTime').value=Math.min(duration,video.currentTime+1).toFixed(1);updateRange()});
 $('setEndBtn').addEventListener('click',()=>{if(!file)return;$('endTime').value=video.currentTime.toFixed(1);updateRange()});
 function drawFrameAt(time,canvas,ctx){return new Promise((resolve,reject)=>{const onSeek=()=>{video.removeEventListener('seeked',onSeek);try{ctx.drawImage(video,0,0,canvas.width,canvas.height);resolve()}catch(e){reject(e)}};video.addEventListener('seeked',onSeek,{once:true});video.currentTime=time})}
+function serviceBase(){return $('modelApiUrl').value.trim().replace(/\\/+$/,'')}
+$('modelApiUrl').addEventListener('input',()=>{ $('modelScanBtn').disabled=!file||!serviceBase(); });
+$('healthBtn').addEventListener('click',async()=>{
+ const base=serviceBase();if(!base){setStatus('modelStatus','Enter the URL of your deployed T-DEED service first.');return}
+ setStatus('modelStatus','Checking service readiness…');
+ try{const response=await fetch(base+'/health');const data=await response.json();if(!response.ok)throw new Error(data.detail||'Health check failed');setStatus('modelStatus',data.ready?'T-DEED service ready: '+data.model+' checkpoint detected.':'Service found, but model is not ready. '+(data.checkpoint_ready?'':'The pretrained checkpoint is missing.'));}catch(error){setStatus('modelStatus','Could not reach the AI service: '+(error.message||String(error)));}
+});
+$('modelScanBtn').addEventListener('click',async()=>{
+ const base=serviceBase();if(!file||!base){setStatus('modelStatus','Upload a video and enter the AI service URL first.');return}
+ $('modelScanBtn').disabled=true;$('modelProgress').style.width='10%';$('modelSuggestions').replaceChildren();setStatus('modelStatus','Uploading video to your selected AI service and running T-DEED…');
+ try{
+  const form=new FormData();form.append('file',file,file.name);
+  const response=await fetch(base+'/api/detect?threshold=0.30',{method:'POST',body:form});
+  const data=await response.json();if(!response.ok)throw new Error(data.detail||'Detection request failed');
+  const events=Array.isArray(data.events)?data.events:[];
+  if(!events.length){setStatus('modelStatus','T-DEED returned no events above this confidence threshold. Try a different clip or threshold.');$('modelProgress').style.width='100%';return}
+  events.sort((a,b)=>(a.time_seconds||0)-(b.time_seconds||0));
+  for(const event of events.slice(0,100)){
+   const card=document.createElement('div');card.className='suggestion';const info=document.createElement('div');const title=document.createElement('strong');title.textContent=String(event.label||'Football event')+' · '+Number(event.time_seconds||0).toFixed(1)+'s';const detail=document.createElement('span');detail.textContent='T-DEED confidence '+Math.round(Number(event.confidence||0)*100)+'%';info.append(title,detail);const btn=document.createElement('button');btn.textContent='Use moment';btn.addEventListener('click',()=>{const t=Number(event.time_seconds)||0;$('startTime').value=Math.max(0,t-2.5).toFixed(1);$('endTime').value=Math.min(duration,t+3).toFixed(1);video.currentTime=Math.min(duration,t);updateRange()});card.append(info,btn);$('modelSuggestions').append(card)
+  }
+  $('modelProgress').style.width='100%';setStatus('modelStatus','T-DEED returned '+events.length+' event predictions. Review labels and timestamps before exporting.');
+ }catch(error){$('modelProgress').style.width='0%';setStatus('modelStatus','Detection failed: '+(error.message||String(error)));}
+ finally{$('modelScanBtn').disabled=!file||!serviceBase()}
+});
 $('scanBtn').addEventListener('click',async()=>{
  if(!file||scanBusy)return;scanBusy=true;$('scanBtn').disabled=true;$('suggestions').replaceChildren();$('scanProgress').style.width='0%';setStatus('scanStatus','Sampling frames for visual activity…');
  const oldTime=video.currentTime, wasPaused=video.paused;const canvas=document.createElement('canvas');canvas.width=96;canvas.height=54;const ctx=canvas.getContext('2d',{willReadFrequently:true});let previous=null;const scores=[];
