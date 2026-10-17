@@ -1,0 +1,13 @@
+{
+  "name": "pitchperfect-ai-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-first football highlight editor for creators",
+  "scripts": {
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "http-server": "^14.1.1"
+  }
+}
