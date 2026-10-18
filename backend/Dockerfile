@@ -21,7 +21,8 @@ RUN pip install \
     timm==1.0.3 \
     matplotlib==3.9.0 \
     SoccerNet \
-    wandb==0.17.4
+    wandb==0.17.4 \
+    ultralytics==8.3.162
 
 COPY patch_tdeed.py /app/patch_tdeed.py
 RUN git clone --depth 1 https://github.com/arturxe2/T-DEED.git /opt/T-DEED \
