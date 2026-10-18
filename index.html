@@ -199,6 +199,45 @@ async function renderAutomaticEdit(){
 }
 autoExportBtn.addEventListener('click',renderAutomaticEdit);
 
+
+let selectedTrackId = null;
+const detectPlayersBtn = $('detectPlayersBtn');
+const detectedPlayerSelect = $('detectedPlayerSelect');
+detectPlayersBtn.addEventListener('click', async () => {
+ const base = serviceBase();
+ if (!file || !base) { setStatus('trackingStatus','Upload a video and enter the AI service URL above first.'); return; }
+ detectPlayersBtn.disabled = true;
+ detectedPlayerSelect.disabled = true;
+ detectedPlayerSelect.replaceChildren(new Option('Detecting players…',''));
+ setStatus('trackingStatus','Uploading video for person detection and short-term tracking…');
+ try {
+  const form = new FormData(); form.append('file',file,file.name);
+  const response = await fetch(base+'/api/track?sample_fps=2', {method:'POST',body:form});
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || 'Player tracking request failed');
+  detectedPlayerSelect.replaceChildren(new Option('Choose a detected player…',''));
+  (data.tracks || []).forEach(track => {
+   const label = 'Track '+track.track_id+' · '+track.first_seen_seconds.toFixed(1)+'s–'+track.last_seen_seconds.toFixed(1)+'s · '+track.detections+' samples';
+   detectedPlayerSelect.add(new Option(label,String(track.track_id)));
+  });
+  detectedPlayerSelect.disabled = !(data.tracks || []).length;
+  setStatus('trackingStatus',(data.tracks || []).length
+   ? 'Found '+data.tracks.length+' anonymous tracks from '+data.detection_count+' sampled detections. Select a track, inspect the video, then enter/confirm the player name above. IDs may switch after cuts or occlusion.'
+   : 'No persistent tracks returned. Check that the tracker model is configured and try a clear, shorter clip.');
+ } catch (error) {
+  detectedPlayerSelect.replaceChildren(new Option('Player detection unavailable',''));
+  setStatus('trackingStatus','Could not detect players: '+(error.message || String(error))+'. Check /api/tracking/health and the backend logs.');
+ } finally { detectPlayersBtn.disabled = false; }
+});
+detectedPlayerSelect.addEventListener('change', () => {
+ selectedTrackId = detectedPlayerSelect.value || null;
+ if (selectedTrackId !== null) {
+  const current = $('clipPlayerName').value.trim();
+  if (!current) $('clipPlayerName').value = 'Track '+selectedTrackId+' (confirm name)';
+  setStatus('trackingStatus','Selected anonymous track '+selectedTrackId+'. Scrub the video to confirm this is the intended player; this track is not a verified identity.');
+ }
+});
+
 updateRange();
 </script>
 
