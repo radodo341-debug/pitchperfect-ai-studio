@@ -12,8 +12,11 @@ inference = root / "inference.py"
 text = inference.read_text()
 old = """model.load(torch.load(os.path.join(
         os.getcwd(), 'checkpoints', args.model.split('_')[0], args.model, 'checkpoint_best.pt')))"""
-new = """model.load(torch.load(os.path.join(
-        os.getcwd(), 'checkpoints', args.model.split('_')[0], args.model, 'checkpoint_best.pt'), map_location='cpu'))"""
+new = """checkpoint_path = os.environ.get(
+        'TDEED_CHECKPOINT_PATH',
+        os.path.join(os.getcwd(), 'checkpoints', args.model.split('_')[0], args.model, 'checkpoint_best.pt')
+    )
+    model.load(torch.load(checkpoint_path, map_location='cpu'))"""
 if old not in text:
     raise SystemExit("Could not safely patch checkpoint loading in upstream inference.py")
 inference.write_text(text.replace(old, new))
@@ -24,4 +27,4 @@ data = json.loads(config.read_text())
 data["batch_size"] = 1
 data["num_workers"] = 0
 config.write_text(json.dumps(data, indent=2) + "\n")
-print("Patched T-DEED for CPU inference, offline feature weights, and lower memory use.")
+print("Patched T-DEED for CPU inference, configured checkpoint path, and lower memory use.")

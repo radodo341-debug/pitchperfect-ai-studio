@@ -18,10 +18,11 @@ TDEED_DIR = Path(os.getenv("TDEED_DIR", "/opt/T-DEED")).resolve()
 MODEL_NAME = os.getenv("TDEED_MODEL", "SoccerNetBall_challenge1")
 THRESHOLD_DEFAULT = float(os.getenv("TDEED_THRESHOLD", "0.30"))
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_MB", "500")) * 1024 * 1024
-CHECKPOINT = TDEED_DIR / "checkpoints" / "SoccerNetBall" / MODEL_NAME / "checkpoint_best.pt"
+DEFAULT_CHECKPOINT = TDEED_DIR / "checkpoints" / "SoccerNetBall" / MODEL_NAME / "checkpoint_best.pt"
+CHECKPOINT = Path(os.getenv("TDEED_CHECKPOINT_PATH", str(DEFAULT_CHECKPOINT))).resolve()
 ALLOWED_SUFFIXES = {".mp4", ".mov", ".mkv", ".webm", ".m4v"}
 
-app = FastAPI(title="PitchPerfect Football Event Detection", version="0.1.0")
+app = FastAPI(title="PitchPerfect Football Event Detection", version="0.2.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
@@ -43,7 +44,7 @@ def _download_checkpoint() -> None:
         raise RuntimeError("TDEED_CHECKPOINT_URL must be a direct HTTPS download URL.")
     CHECKPOINT.parent.mkdir(parents=True, exist_ok=True)
     partial = CHECKPOINT.with_suffix(".pt.part")
-    request = urllib.request.Request(url, headers={"User-Agent": "PitchPerfect-TDEED/0.1"})
+    request = urllib.request.Request(url, headers={"User-Agent": "PitchPerfect-TDEED/0.2"})
     total = 0
     try:
         with urllib.request.urlopen(request, timeout=60) as response, partial.open("wb") as output:
@@ -57,7 +58,6 @@ def _download_checkpoint() -> None:
                 output.write(chunk)
         with partial.open("rb") as downloaded:
             signature = downloaded.read(8)
-        # PyTorch checkpoints are commonly ZIP archives ("PK") or legacy pickle streams.
         if total < 1024 * 1024 or not (signature.startswith(b"PK") or signature.startswith(b"\\x80")):
             raise RuntimeError("Checkpoint URL did not return a recognizable PyTorch checkpoint file.")
         partial.replace(CHECKPOINT)
@@ -98,13 +98,13 @@ def health() -> dict[str, Any]:
 async def detect(file: UploadFile = File(...), threshold: float = THRESHOLD_DEFAULT):
     status = model_status()
     if not status["source_ready"]:
-        raise HTTPException(status_code=503, detail="T-DEED source is missing from the server image.")
+        raise HTTPException(status_code=503, detail="Pinned T-DEED source is missing from the server image.")
     if not status["checkpoint_ready"]:
         raise HTTPException(
             status_code=503,
             detail=(
-                "The T-DEED model code is installed, but its pretrained checkpoint is missing. "
-                f"Place checkpoint_best.pt at {CHECKPOINT}; see backend/README.md."
+                "The T-DEED source is installed, but its pretrained checkpoint is missing. "
+                f"Place the verified SoccerNet Ball checkpoint at {CHECKPOINT}; see backend/SETUP.md."
             ),
         )
     if not 0.01 <= threshold <= 0.99:
@@ -130,6 +130,19 @@ async def detect(file: UploadFile = File(...), threshold: float = THRESHOLD_DEFA
         await file.close()
         if size == 0:
             raise HTTPException(status_code=400, detail="The uploaded video is empty.")
+
+        # Use the uploaded file's actual frame rate for timestamps rather than assuming 25 fps.
+        fps = 25.0
+        try:
+            import cv2
+            cap = cv2.VideoCapture(str(video_path))
+            if cap.isOpened():
+                measured_fps = cap.get(cv2.CAP_PROP_FPS)
+                if measured_fps and 1 <= measured_fps <= 240:
+                    fps = float(measured_fps)
+            cap.release()
+        except ImportError:
+            pass
 
         async with inference_lock:
             output_dir = TDEED_DIR / "inference_output"
@@ -166,19 +179,21 @@ async def detect(file: UploadFile = File(...), threshold: float = THRESHOLD_DEFA
                 raw = json.loads(output_file.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError) as exc:
                 raise HTTPException(status_code=500, detail=f"Could not read model predictions: {exc}")
+            finally:
+                output_file.unlink(missing_ok=True)
 
-            # The SoccerNet Ball model predicts at stride 2 over 25 fps frames.
+            # Upstream T-DEED writes {predictions: [{frame, label, confidence}, ...]}.
             events = []
             for item in raw.get("predictions", []):
                 frame = int(item.get("frame", 0))
+                confidence = float(item.get("confidence", item.get("score", 0)))
                 events.append({
                     "label": str(item.get("label", "Unknown")),
-                    "time_seconds": round(frame / 25, 3),
+                    "time_seconds": round(frame / fps, 3),
                     "frame": frame,
-                    "confidence": round(float(item.get("confidence", 0)), 4),
+                    "confidence": round(confidence, 4),
                     "source": "T-DEED SoccerNet Ball Action Spotting",
                 })
-            output_file.unlink(missing_ok=True)
             return JSONResponse({
                 "model": MODEL_NAME,
                 "model_family": "T-DEED",
