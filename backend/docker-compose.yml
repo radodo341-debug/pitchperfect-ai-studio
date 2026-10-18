@@ -1,0 +1,13 @@
+services:
+  pitchperfect-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./models:/models:ro
+      - ./T-DEED:/opt/T-DEED:ro
+    restart: unless-stopped
