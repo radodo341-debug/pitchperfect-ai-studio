@@ -1,9 +1,12 @@
-# Python 3.11; pins the service and tracking runtime. Install PyTorch from the
-# official CPU/CUDA index appropriate to your deployment before this file.
+# Runtime pinned for Python 3.11. CPU PyTorch wheels are installed separately in Dockerfile.
 fastapi==0.115.12
-uvicorn[standard]==0.34.2
+uvicorn[standard]==0.34.0
 python-multipart==0.0.20
-opencv-python-headless==4.11.0.86
+opencv-python-headless==4.10.0.84
+timm==1.0.3
+matplotlib==3.9.0
+SoccerNet==0.1.62
+wandb==0.17.4
 ultralytics==8.3.162
 pytest==8.3.5
 httpx==0.28.1
