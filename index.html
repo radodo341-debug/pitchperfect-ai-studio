@@ -259,6 +259,11 @@ updateRange();
      <label><input type="checkbox" value="Tackles & saves"> Tackles / saves</label>
     </div>
    </div>
+   <div class="row" style="margin-top:12px">
+    <button id="detectPlayersBtn" type="button">Detect players in uploaded video</button>
+    <select id="detectedPlayerSelect" aria-label="Select detected player track" disabled><option value="">Detect players first</option></select>
+   </div>
+   <p id="trackingStatus" class="workflow-note">Player detection requires the configured AI service URL and a compatible tracking model. Track IDs are anonymous; confirm the player visually.</p>
    <button class="primary" id="buildPlayerShortlist" type="button">Build moment shortlist</button>
    <p class="workflow-note">This prototype uses the current motion-based candidate scan as a starting point. It cannot yet verify which player appears or reliably classify celebrations, reactions, goals, tackles or manager shots. Review and tag candidates before exporting.</p>
   </div>
