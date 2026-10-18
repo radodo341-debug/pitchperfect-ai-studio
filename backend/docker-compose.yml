@@ -7,7 +7,9 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      TDEED_CHECKPOINT_PATH: /models/SoccerNetBall_challenge1/checkpoint_best.pt
+      PP_TRACKER_MODEL: /models/yolo-person.pt
     volumes:
       - ./models:/models:ro
-      - ./T-DEED:/opt/T-DEED:ro
     restart: unless-stopped
