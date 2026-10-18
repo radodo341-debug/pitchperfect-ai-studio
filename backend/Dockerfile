@@ -22,6 +22,7 @@ RUN git clone --depth 1 https://github.com/arturxe2/T-DEED.git /opt/T-DEED \
     && python /app/patch_tdeed.py
 
 COPY main.py player_tracking.py /app/
+COPY tests /app/tests
 COPY start.sh /app/start.sh
 RUN mkdir -p /models /data
 WORKDIR /app
