@@ -17,7 +17,7 @@ RUN python -m pip install --upgrade pip==25.1.1 \
        torch==2.3.1 torchvision==0.18.1 \
     && python -m pip install -r /app/requirements.txt
 
-# Pin upstream T-DEED to a reviewed immutable commit instead of cloning a moving branch.
+COPY patch_tdeed.py /app/patch_tdeed.py
 ARG TDEED_COMMIT=d953b4de8a2ad941c565e1683c5b07255cbe644e
 RUN git init /opt/T-DEED \
     && git -C /opt/T-DEED remote add origin https://github.com/arturxe2/T-DEED.git \
