@@ -6,7 +6,9 @@ on:
       - "backend/**"
       - ".github/workflows/backend-tests.yml"
   push:
-    branches: [main]
+    branches:
+      - main
+      - feature/reproducible-ai-backend-player-selection
     paths:
       - "backend/**"
       - ".github/workflows/backend-tests.yml"
