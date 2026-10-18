@@ -201,5 +201,66 @@ autoExportBtn.addEventListener('click',renderAutomaticEdit);
 
 updateRange();
 </script>
+
+<style>
+.player-workflow{margin-top:18px}.player-workflow .workflow-grid{display:grid;grid-template-columns:1fr 1.25fr;gap:14px}.player-workflow .field{display:flex;flex-direction:column;gap:6px;margin:10px 0}.player-workflow input,.player-workflow select{width:100%;background:#0a0e10;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:11px}.event-picks{display:flex;gap:8px;flex-wrap:wrap}.event-picks label{border:1px solid var(--line);border-radius:999px;padding:7px 10px;color:var(--muted);font-size:12px;display:flex;gap:6px;align-items:center}.event-picks input{width:auto;accent-color:var(--green)}.player-candidate{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}.player-candidate strong,.player-candidate small{display:block}.player-candidate small{color:var(--muted);margin-top:3px}.workflow-note{color:var(--muted);font-size:12px;margin-top:12px;line-height:1.6}@media(max-width:800px){.player-workflow .workflow-grid{grid-template-columns:1fr}}
+</style>
+<section class="panel player-workflow" id="playerWorkflow">
+ <div class="panel-head"><div><div class="eyebrow">Player-focused clipping</div><h2 style="margin:4px 0">Find a player's best moments</h2><p style="margin:0;color:var(--muted)">Build a shortlist from the uploaded match, then review and tag each moment.</p></div><span class="pill">Football workflow</span></div>
+ <div class="workflow-grid">
+  <div>
+   <label class="field"><strong>Player to clip</strong><input id="clipPlayerName" placeholder="e.g. Mohamed Salah"></label>
+   <div class="field"><strong>Moment types to look for</strong>
+    <div class="event-picks">
+     <label><input type="checkbox" value="Goals" checked> Goals</label>
+     <label><input type="checkbox" value="Skills & dribbles" checked> Skills</label>
+     <label><input type="checkbox" value="Celebrations" checked> Celebrations</label>
+     <label><input type="checkbox" value="Player reactions" checked> Player reactions</label>
+     <label><input type="checkbox" value="Manager reactions" checked> Manager reactions</label>
+     <label><input type="checkbox" value="Tackles & saves"> Tackles / saves</label>
+    </div>
+   </div>
+   <button class="primary" id="buildPlayerShortlist" type="button">Build moment shortlist</button>
+   <p class="workflow-note">This prototype uses the current motion-based candidate scan as a starting point. It cannot yet verify which player appears or reliably classify celebrations, reactions, goals, tackles or manager shots. Review and tag candidates before exporting.</p>
+  </div>
+  <div>
+   <div class="panel-head"><strong>Candidate moments</strong><span class="pill" id="playerCandidateCount">Waiting for analysis</span></div>
+   <div id="playerCandidateList"><p style="color:var(--muted)">Upload a match and run Automatic Edit analysis first. Candidate timestamps will appear here for review.</p></div>
+  </div>
+ </div>
+</section>
+<script>
+(function(){
+ const $id=id=>document.getElementById(id);
+ const list=$id('playerCandidateList'), count=$id('playerCandidateCount');
+ function build(){
+  const player=$id('clipPlayerName').value.trim()||'Selected player';
+  const types=Array.from(document.querySelectorAll('#playerWorkflow .event-picks input:checked')).map(x=>x.value);
+  if(!Array.isArray(window.autoPlan)&&typeof autoPlan==='undefined'){
+   list.innerHTML='<p style="color:var(--muted)">Run Automatic Edit analysis first to create candidate timestamps.</p>';return;
+  }
+  const plan=typeof autoPlan!=='undefined'?autoPlan:[];
+  if(!plan.length){list.innerHTML='<p style="color:var(--muted)">No candidate timestamps yet. Upload a match and run Automatic Edit analysis first.</p>';count.textContent='No candidates';return;}
+  list.innerHTML='';
+  plan.forEach((seg,i)=>{
+   const row=document.createElement('div');row.className='player-candidate';
+   const info=document.createElement('div'),title=document.createElement('strong'),detail=document.createElement('small');
+   title.textContent=player+' · Candidate '+(i+1);
+   detail.textContent=seg.start.toFixed(1)+'s – '+seg.end.toFixed(1)+'s · Needs review';
+   info.append(title,detail);
+   const controls=document.createElement('div');controls.style.display='flex';controls.style.gap='6px';controls.style.alignItems='center';
+   const select=document.createElement('select');select.setAttribute('aria-label','Tag candidate moment');
+   const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='Tag moment';select.append(placeholder);
+   types.forEach(type=>{const opt=document.createElement('option');opt.value=type;opt.textContent=type;select.append(opt)});
+   const preview=document.createElement('button');preview.textContent='Preview';preview.type='button';
+   preview.addEventListener('click',()=>{if(typeof video!=='undefined'){video.currentTime=seg.start;video.play().catch(()=>{});}const start=$id('startTime'),end=$id('endTime');if(start&&end){start.value=seg.start.toFixed(1);end.value=seg.end.toFixed(1);if(typeof updateRange==='function')updateRange();}});
+   controls.append(select,preview);row.append(info,controls);list.append(row);
+  });
+  count.textContent=plan.length+' candidates';
+ }
+ $id('buildPlayerShortlist').addEventListener('click',build);
+})();
+</script>
+
 </body>
 </html>
