@@ -189,6 +189,60 @@ async def detect(file: UploadFile = File(...), threshold: float = THRESHOLD_DEFA
             })
 
 
+@app.get("/api/tracking/health")
+def tracking_health() -> dict[str, Any]:
+    """Report whether an optional player tracking model is configured."""
+    from player_tracking import tracking_status
+    return tracking_status()
+
+
+@app.post("/api/track")
+async def track_players(file: UploadFile = File(...), sample_fps: float = 2.0):
+    """Return anonymous person tracks from a match; does not identify player names."""
+    from player_tracking import sample_video
+    if not 0.2 <= sample_fps <= 5:
+        raise HTTPException(status_code=400, detail="sample_fps must be between 0.2 and 5")
+    suffix = Path(file.filename or "upload.mp4").suffix.lower()
+    if suffix not in ALLOWED_SUFFIXES:
+        raise HTTPException(status_code=415, detail="Upload an MP4, MOV, MKV, WebM or M4V video.")
+    with tempfile.TemporaryDirectory(prefix="pitchperfect-track-") as temp_dir:
+        video_path = Path(temp_dir) / ("input" + suffix)
+        size = 0
+        with video_path.open("wb") as target:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > MAX_UPLOAD_BYTES:
+                    raise HTTPException(status_code=413, detail=f"Video exceeds {MAX_UPLOAD_BYTES // (1024 * 1024)} MB limit.")
+                target.write(chunk)
+        await file.close()
+        if size == 0:
+            raise HTTPException(status_code=400, detail="The uploaded video is empty.")
+        try:
+            detections = await asyncio.to_thread(sample_video, str(video_path), sample_fps)
+        except (RuntimeError, ValueError) as exc:
+            raise HTTPException(status_code=503, detail=str(exc))
+        tracks: dict[str, dict[str, Any]] = {}
+        for detection in detections:
+            track_id = detection.get("track_id")
+            if track_id is None:
+                continue
+            key = str(track_id)
+            item = tracks.setdefault(key, {"track_id": track_id, "first_seen_seconds": detection["time_seconds"], "last_seen_seconds": detection["time_seconds"], "detections": 0, "identity_status": "unresolved"})
+            item["last_seen_seconds"] = detection["time_seconds"]
+            item["detections"] += 1
+        return JSONResponse({
+            "provider": "Ultralytics YOLO + ByteTrack",
+            "sample_fps": sample_fps,
+            "detection_count": len(detections),
+            "tracks": list(tracks.values()),
+            "detections": detections,
+            "warning": "Track IDs are anonymous and may change after cuts or occlusion. They are not named-player identity. Confirm the player before connecting tracks to football events.",
+        })
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", "8000")))
